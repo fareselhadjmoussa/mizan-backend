@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { getInventory, adjustStock, getStockLogs } from '../controllers/inventory.controller';
+import { authenticate } from '../middleware/auth';
+import { adminOnly } from '../middleware/roles';
+const router = Router();
+router.use(authenticate);
+router.get('/', getInventory);
+router.post('/adjust', adminOnly, adjustStock);
+router.get('/logs/:productId', getStockLogs);
+export default router;
