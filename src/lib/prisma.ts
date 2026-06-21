@@ -1,7 +1,6 @@
-import { PrismaClient } from '../generated/prisma/client';
+import { PrismaClient } from '@prisma/client';
 
-// Reuse a single PrismaClient instance across hot-reloads in development
-// to avoid exhausting Neon's connection pool.
+// Reuse Prisma instance to avoid too many connections (important for Render/Neon)
 declare global {
   // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;
@@ -10,7 +9,9 @@ declare global {
 export const prisma =
   global.__prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    log: process.env.NODE_ENV === 'development'
+      ? ['warn', 'error']
+      : ['error'],
   });
 
 if (process.env.NODE_ENV !== 'production') {

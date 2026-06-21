@@ -22,8 +22,9 @@ const isProd = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────
-// ✅ FIXED CORS (100% SAFE)
+// ✅ FIXED CORS (Render + Vercel safe)
 // ─────────────────────────────────────────────
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
@@ -32,17 +33,22 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // السماح للطلبات بدون origin (mobile / postman)
+    // السماح للطلبات بدون origin (Postman / mobile / server-to-server)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    const isAllowed = allowedOrigins.some((o) => {
+      if (!o) return false;
+      return origin === o;
+    });
+
+    if (isAllowed) {
       return callback(null, true);
     }
 
     console.log("❌ Blocked origin:", origin);
 
-    // ❌ مهم: لا ترجع false ولا Error
-    return callback(null, true);
+    // لا نكسر الطلب، فقط نرفض CORS بدون crash
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -75,13 +81,14 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Health
+// Health check (FIX مهم)
 app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok' });
+    return res.status(200).json({ status: 'ok' });
   } catch (err) {
-    res.status(503).json({ status: 'error' });
+    console.error("❌ DB Health Error:", err);
+    return res.status(500).json({ status: 'error', db: 'down' });
   }
 });
 
@@ -103,7 +110,7 @@ app.use((_req, res) => {
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error('🔥 ERROR:', err);
 
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     error: err instanceof Error ? err.message : 'Internal server error',
   });
@@ -111,7 +118,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
 app.use(errorHandler);
 
-// Start
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running on port ${PORT}`);
 });
