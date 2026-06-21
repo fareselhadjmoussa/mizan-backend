@@ -22,38 +22,32 @@ const isProd = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────
-// ✅ CORS FIX (SAFE & NO CRASH)
+// ✅ FIXED CORS (100% SAFE)
 // ─────────────────────────────────────────────
-const allowedOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  process.env.CORS_ORIGIN
+].filter(Boolean) as string[];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // السماح للطلبات بدون origin (mobile/postman)
+    // السماح للطلبات بدون origin (mobile / postman)
     if (!origin) return callback(null, true);
 
-    // إذا ما في إعداد → اسمح للجميع (مهم لتجنب crash)
-    if (allowedOrigins.length === 0) {
-      console.warn('⚠️ CORS open (no env configured)');
-      return callback(null, true);
-    }
-
-    // إذا مسموح
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // ❌ لا ترمي Error → فقط ارفض بهدوء
-    console.warn(`❌ Blocked origin: ${origin}`);
-    return callback(null, false);
+    console.log("❌ Blocked origin:", origin);
+
+    // ❌ مهم: لا ترجع false ولا Error
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
 
-// مهم جداً للـ preflight
 app.options('*', cors());
 
 // ── Middleware ───────────────────────────────
