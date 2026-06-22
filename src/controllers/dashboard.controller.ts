@@ -8,15 +8,13 @@ interface ChartDay  { date: string; total: number; count: number; }
 interface TopProduct { id: string; name: string; price: number; totalQty: number; }
 interface RecentSale { id: string; invoiceNo: string; total: number; paymentType: string; createdAt: Date; cashier: string; }
 
+// Raw shape returned by the $queryRaw for the 7-day chart
+interface Day7Raw { date: string; total: number; count: bigint; }
+
 const DASHBOARD_CACHE_KEY = 'dashboard:overview';
 const DASHBOARD_TTL_MS = 20_000; // 20s — short enough to feel live, long enough to absorb bursts
 
 // GET /api/dashboard
-//
-// IMPORTANT: every number here is computed *in Postgres* (aggregate / groupBy /
-// raw SQL), never by pulling the full `sales` table into Node and reducing it
-// in memory. That earlier approach is what caused P2024 connection-pool
-// timeouts under concurrent load — see project history for the full analysis.
 export const getDashboard = async (_req: Request, res: Response): Promise<void> => {
   try {
     const data = await cached(DASHBOARD_CACHE_KEY, DASHBOARD_TTL_MS, computeDashboard);
@@ -45,13 +43,11 @@ async function computeDashboard() {
     prisma.sale.aggregate({ _sum: { total: true }, _count: true, where: { createdAt: { gte: monthStart } } }),
     prisma.sale.aggregate({ _sum: { total: true }, _count: true, where: { createdAt: { gte: lastMonthStart, lte: lastMonthEnd } } }),
     prisma.product.count({ where: { isActive: true } }),
-    // lowStock comparison is column-vs-column, which Prisma's `where` can't express
-    // directly — a tiny raw query is the cleanest, still index-friendly option.
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(*)::bigint as count FROM "products"
       WHERE "isActive" = true AND "stock" <= "lowStock"
     `,
-    prisma.$queryRaw<{ date: string; total: number; count: bigint }[]>`
+    prisma.$queryRaw<Day7Raw[]>`
       SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') as date,
              COALESCE(SUM("total"), 0)::float as total,
              COUNT(*)::bigint as count
@@ -77,9 +73,10 @@ async function computeDashboard() {
     }),
   ]);
 
-  // Fill in any missing calendar days (no sales that day) with zeros so the
-  // chart always has exactly 7 points.
-  const byDate = new Map(last7DaysRaw.map(d => [d.date, d]));
+  // Fill in any missing calendar days (no sales that day) with zeros
+  const byDate = new Map<string, Day7Raw>(
+    last7DaysRaw.map((d): [string, Day7Raw] => [d.date, d])
+  );
   const last7Days: ChartDay[] = Array.from({ length: 7 }, (_, i) => {
     const day = new Date(sevenDaysAgo);
     day.setDate(day.getDate() + i);
@@ -88,17 +85,18 @@ async function computeDashboard() {
     return { date: key, total: row ? Number(row.total) : 0, count: row ? Number(row.count) : 0 };
   });
 
-  // Top products: only fetch the handful of product rows we actually need,
-  // never the whole product table.
-  const topProductIds = topItemsRaw.map(t => t.productId);
+  // Top products: only fetch the handful of product rows we actually need
+  const topProductIds = topItemsRaw.map((t) => t.productId);
   const topProductDetails = topProductIds.length
     ? await prisma.product.findMany({
         where: { id: { in: topProductIds } },
         select: { id: true, name: true, price: true },
       })
     : [];
-  const productMap = new Map(topProductDetails.map(p => [p.id, p]));
-  const topProducts: TopProduct[] = topItemsRaw.map(t => {
+  const productMap = new Map<string, typeof topProductDetails[number]>(
+    topProductDetails.map((p): [string, typeof topProductDetails[number]] => [p.id, p])
+  );
+  const topProducts: TopProduct[] = topItemsRaw.map((t) => {
     const p = productMap.get(t.productId);
     return {
       id: t.productId,
@@ -108,7 +106,7 @@ async function computeDashboard() {
     };
   });
 
-  const recentSales: RecentSale[] = recentSalesRaw.map(s => ({
+  const recentSales: RecentSale[] = recentSalesRaw.map((s) => ({
     id: s.id,
     invoiceNo: s.invoiceNo,
     total: Number(s.total),

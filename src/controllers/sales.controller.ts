@@ -4,7 +4,7 @@ import { AuthRequest, PayType } from '../types';
 import { serializeSale } from '../utils/serialize';
 import { ok, created, badRequest, notFound, serverError } from '../utils/response';
 import { generateInvoiceNo } from '../utils/invoice';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma';
 import { invalidatePrefix } from '../lib/cache';
 
 interface CreateSaleBody {
@@ -54,10 +54,10 @@ export const createSale = async (req: AuthRequest, res: Response): Promise<void>
 
     const invoiceNo = generateInvoiceNo();
 
-    const sale = await prisma.$transaction(async (tx) => {
+    const sale = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const productIds = [...new Set(normalizedItems.map(i => i.productId))];
       const products = await tx.product.findMany({ where: { id: { in: productIds } } });
-      const productMap = new Map(products.map(p => [p.id, p]));
+      const productMap = new Map(products.map((p) => [p.id, p] as [string, typeof p]));
 
       for (const item of normalizedItems) {
         const product = productMap.get(item.productId);

@@ -7,7 +7,7 @@
  * column is normalized here before it's sent in an API response.
  */
 
-import { Product, Sale, SaleItem, User } from '../generated/prisma/client';
+import type { Product, Sale, SaleItem, User } from '../generated/prisma';
 
 // Converts a Prisma Decimal (or null) to a plain number (or undefined)
 const num = (value: unknown): number =>

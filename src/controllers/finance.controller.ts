@@ -14,11 +14,6 @@ const FINANCE_CACHE_KEY = 'finance:summary';
 const FINANCE_TTL_MS = 20_000;
 
 // GET /api/finance — full financial overview
-//
-// Every period total is computed with a single `aggregate()` call in
-// Postgres (SUM/COUNT pushed down to the DB), instead of pulling every sale
-// row ever created into Node and reducing it five times in memory. See
-// project history for why that pattern caused connection-pool exhaustion.
 export const getFinanceSummary = async (_req: Request, res: Response): Promise<void> => {
   try {
     const data = await cached(FINANCE_CACHE_KEY, FINANCE_TTL_MS, computeFinanceSummary);
@@ -57,9 +52,6 @@ async function computeFinanceSummary() {
     periodAgg({ createdAt: { gte: weekStart } }),
     periodAgg({ createdAt: { gte: monthStart } }),
     periodAgg({ createdAt: { gte: yearStart } }),
-    // Cash/card totals: sum the explicit cashPaid/cardPaid columns where set,
-    // falling back to `total` for pure CASH/CARD sales — done as raw SQL so
-    // the COALESCE/CASE logic runs in Postgres, not row-by-row in Node.
     prisma.$queryRaw<{ total: number }[]>`
       SELECT COALESCE(SUM(COALESCE("cashPaid", CASE WHEN "paymentType" = 'CASH' THEN "total" ELSE 0 END)), 0)::float as total
       FROM "sales"
@@ -82,7 +74,7 @@ async function computeFinanceSummary() {
   const allTime = toTotals(allTimeAgg);
   const avgSale = allTime.count > 0 ? allTime.revenue / allTime.count : 0;
 
-  const recentSales: RecentSale[] = recentRaw.map(s => ({
+  const recentSales: RecentSale[] = recentRaw.map((s) => ({
     id: s.id,
     invoiceNo: s.invoiceNo,
     total: Number(s.total),
@@ -106,11 +98,9 @@ async function computeFinanceSummary() {
   };
 }
 
-// POST /api/finance/reset — admin only. Clears all sales/income history.
+// POST /api/finance/reset — admin only
 export const resetFinance = async (_req: Request, res: Response): Promise<void> => {
   try {
-    // Sale rows cascade-delete their SaleItem children (see schema.prisma),
-    // so a single deleteMany clears the full sales history.
     await prisma.sale.deleteMany();
     invalidatePrefix('finance:');
     invalidatePrefix('dashboard:');

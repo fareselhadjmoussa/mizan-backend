@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../types';
 import { serializeProduct } from '../utils/serialize';
 import { ok, created, badRequest, notFound, serverError } from '../utils/response';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma';
 
 const normalizeText = (value: unknown): string => String(value ?? '').trim();
 const normalizeOptional = (value: unknown): string | null => {
@@ -41,7 +41,9 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     };
 
     let items = await prisma.product.findMany({ where, orderBy: { name: 'asc' } });
-    if (lowStock === 'true') items = items.filter(p => p.stock <= p.lowStock);
+    if (lowStock === 'true') {
+      items = items.filter((p) => p.stock <= p.lowStock);
+    }
 
     const total     = items.length;
     const paginated = items.slice((pageNum - 1) * limitNum, pageNum * limitNum);
@@ -60,7 +62,7 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
 export const getLowStockProducts = async (_req: Request, res: Response): Promise<void> => {
   try {
     const items = (await prisma.product.findMany({ where: { isActive: true } }))
-      .filter(p => p.stock <= p.lowStock)
+      .filter((p) => p.stock <= p.lowStock)
       .sort((a, b) => a.stock - b.stock);
 
     ok(res, items.map(serializeProduct));

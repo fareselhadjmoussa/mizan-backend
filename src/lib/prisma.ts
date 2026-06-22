@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma';
 
 // Reuse Prisma instance to avoid too many connections (important for Render/Neon)
 declare global {

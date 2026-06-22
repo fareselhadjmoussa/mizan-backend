@@ -15,9 +15,9 @@ export const getInventory = async (_req: Request, res: Response): Promise<void> 
 
     const summary = {
       totalProducts:   products.length,
-      totalValue:      products.reduce((s, p) => s + Number(p.price) * p.stock, 0),
-      lowStockCount:   products.filter(p => p.stock > 0 && p.stock <= p.lowStock).length,
-      outOfStockCount: products.filter(p => p.stock === 0).length,
+      totalValue:      products.reduce((s: number, p) => s + Number(p.price) * p.stock, 0),
+      lowStockCount:   products.filter((p) => p.stock > 0 && p.stock <= p.lowStock).length,
+      outOfStockCount: products.filter((p) => p.stock === 0).length,
     };
 
     ok(res, { products: products.map(serializeProduct), summary });
