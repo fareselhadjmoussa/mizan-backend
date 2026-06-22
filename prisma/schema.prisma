@@ -1,12 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider      = "prisma-client"
-  output        = "../src/generated/prisma"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -14,9 +8,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// ENUMS
-// ════════════════════════════════════════════════════════════════════════════
+// ================= ENUMS =================
 
 enum Role {
   ADMIN
@@ -35,9 +27,7 @@ enum LogType {
   ADJUSTMENT
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// MODELS
-// ════════════════════════════════════════════════════════════════════════════
+// ================= MODELS =================
 
 model User {
   id           String   @id @default(uuid())
