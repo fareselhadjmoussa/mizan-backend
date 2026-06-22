@@ -1,15 +1,6 @@
-/**
- * 🔁 SERIALIZATION HELPERS
- * ════════════════════════════════════════════════════════════════════════════
- * Prisma maps PostgreSQL `Decimal` columns (price, totals, etc.) to its own
- * `Decimal` runtime type — not a plain JS `number`. The frontend has always
- * worked with plain numbers, so every value that came out of a Decimal
- * column is normalized here before it's sent in an API response.
- */
+import type { Product, Sale, SaleItem, User } from '@prisma/client';
 
-import type { Product, Sale, SaleItem, User } from '../generated/prisma';
-
-// Converts a Prisma Decimal (or null) to a plain number (or undefined)
+// Converts Prisma Decimal (or null) to number
 const num = (value: unknown): number =>
   value === null || value === undefined ? 0 : Number(value);
 
