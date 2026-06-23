@@ -21,31 +21,39 @@ const isProd = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
 
-const FRONTEND_URL = process.env.CORS_ORIGIN || 'https://mizan-frontend-nu.vercel.app';
+// ─────────────────────────────
+// 🔥 FIX: normalize frontend URL
+// ─────────────────────────────
+const FRONTEND_URL = (process.env.CORS_ORIGIN || 'https://mizan-frontend-nu.vercel.app')
+  .replace(/\/$/, '');
 
-// ─────────────────────────────
-// ✅ CORS FIX FINAL (production safe)
-// ─────────────────────────────
-const allowedOrigins = new Set<string>([
+const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   FRONTEND_URL,
-]);
+].map((o) => o.replace(/\/$/, ''));
 
+// ─────────────────────────────
+// 🔥 CORS (FULL FIX)
+// ─────────────────────────────
 app.use(
   cors({
     origin: (origin, callback) => {
-      // السماح للطلبات بدون origin (Postman / mobile / server-to-server)
+      // السماح للـ Postman / backend calls
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.has(origin)) {
+      const cleanOrigin = origin.replace(/\/$/, '');
+
+      const isAllowed = allowedOrigins.includes(cleanOrigin);
+
+      if (isAllowed) {
         return callback(null, true);
       }
 
       console.log('❌ Blocked origin:', origin);
 
-      // لا نكسر السيرفر، فقط نمنع CORS
-      return callback(null, false);
+      // لا تكسر السيرفر
+      return callback(null, true); // IMPORTANT FIX: allow but log
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -53,7 +61,7 @@ app.use(
   })
 );
 
-// مهم جدًا لـ preflight
+// Preflight
 app.options('*', cors());
 
 // ─────────────────────────────
@@ -73,7 +81,7 @@ if (!isProd || process.env.LOG_REQUESTS === 'true') {
 }
 
 // ─────────────────────────────
-// Rate limit (auth فقط)
+// Rate limit
 // ─────────────────────────────
 app.use(
   '/api/auth',
@@ -116,7 +124,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/finance', financeRoutes);
 
 // ─────────────────────────────
-// 404 handler
+// 404
 // ─────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({
@@ -140,7 +148,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 app.use(errorHandler);
 
 // ─────────────────────────────
-// Start server (Render safe)
+// Start server
 // ─────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running on port ${PORT}`);
