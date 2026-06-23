@@ -1,11 +1,18 @@
 import type { Product, Sale, SaleItem, User } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 // Converts Prisma Decimal (or null) to number
-const num = (value: unknown): number =>
-  value === null || value === undefined ? 0 : Number(value);
+const num = (value: unknown): number => {
+  if (value instanceof Decimal) return value.toNumber();
+  if (value === null || value === undefined) return 0;
+  return Number(value);
+};
 
-const numOrUndefined = (value: unknown): number | undefined =>
-  value === null || value === undefined ? undefined : Number(value);
+const numOrUndefined = (value: unknown): number | undefined => {
+  if (value instanceof Decimal) return value.toNumber();
+  if (value === null || value === undefined) return undefined;
+  return Number(value);
+};
 
 export const serializeProduct = (p: Product) => ({
   ...p,

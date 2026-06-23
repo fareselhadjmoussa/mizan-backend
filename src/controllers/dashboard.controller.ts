@@ -69,9 +69,24 @@ async function computeDashboard() {
     topItemsRaw,
     recentSalesRaw,
   ] = await Promise.all([
-    prisma.sale.aggregate({ _sum: { total: true }, _count: true, where: { createdAt: { gte: todayStart } } }),
-    prisma.sale.aggregate({ _sum: { total: true }, _count: true, where: { createdAt: { gte: weekStart } } }),
-    prisma.sale.aggregate({ _sum: { total: true }, _count: true, where: { createdAt: { gte: monthStart } } }),
+    prisma.sale.aggregate({
+      _sum: { total: true },
+      _count: true,
+      where: { createdAt: { gte: todayStart } },
+    }),
+
+    prisma.sale.aggregate({
+      _sum: { total: true },
+      _count: true,
+      where: { createdAt: { gte: weekStart } },
+    }),
+
+    prisma.sale.aggregate({
+      _sum: { total: true },
+      _count: true,
+      where: { createdAt: { gte: monthStart } },
+    }),
+
     prisma.sale.aggregate({
       _sum: { total: true },
       _count: true,
@@ -100,7 +115,9 @@ async function computeDashboard() {
     prisma.saleItem.groupBy({
       by: ['productId'],
       _sum: { qty: true },
-      where: { sale: { createdAt: { gte: monthStart } } },
+      where: {
+        sale: { createdAt: { gte: monthStart } },
+      },
       orderBy: { _sum: { qty: 'desc' } },
       take: 5,
     }),
@@ -120,10 +137,10 @@ async function computeDashboard() {
   ]);
 
   // ─────────────────────────────
-  // FIX: last 7 days map typing
+  // last 7 days
   // ─────────────────────────────
   const byDate = new Map<string, Day7Raw>(
-    last7DaysRaw.map((d: Day7Raw): [string, Day7Raw] => [d.date, d])
+    last7DaysRaw.map((d) => [d.date, d])
   );
 
   const last7Days: ChartDay[] = Array.from({ length: 7 }, (_, i) => {
@@ -141,9 +158,9 @@ async function computeDashboard() {
   });
 
   // ─────────────────────────────
-  // FIX: top products typing
+  // top products
   // ─────────────────────────────
-  const topProductIds = topItemsRaw.map((t: any) => t.productId);
+  const topProductIds = topItemsRaw.map((t) => t.productId);
 
   const topProductDetails = topProductIds.length
     ? await prisma.product.findMany({
@@ -152,25 +169,25 @@ async function computeDashboard() {
       })
     : [];
 
-  const productMap = new Map<string, (typeof topProductDetails)[number]>(
+  const productMap = new Map(
     topProductDetails.map((p) => [p.id, p])
   );
 
-  const topProducts: TopProduct[] = topItemsRaw.map((t: any) => {
+  const topProducts: TopProduct[] = topItemsRaw.map((t) => {
     const p = productMap.get(t.productId);
 
     return {
       id: t.productId,
       name: p?.name ?? 'Deleted Product',
       price: p ? Number(p.price) : 0,
-      totalQty: Number(t._sum?.qty ?? 0),
+      totalQty: Number(t._sum.qty ?? 0),
     };
   });
 
   // ─────────────────────────────
-  // FIX: recent sales typing
+  // recent sales
   // ─────────────────────────────
-  const recentSales: RecentSale[] = recentSalesRaw.map((s: any) => ({
+  const recentSales: RecentSale[] = recentSalesRaw.map((s) => ({
     id: s.id,
     invoiceNo: s.invoiceNo,
     total: Number(s.total),
@@ -197,7 +214,7 @@ async function computeDashboard() {
       monthSales: monthAgg._count,
       revenueGrowth,
       totalProducts,
-      lowStockCount: Number((lowStockCount as any)[0]?.count ?? 0),
+      lowStockCount: Number(lowStockCount[0]?.count ?? 0),
     },
     topProducts,
     last7Days,
