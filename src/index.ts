@@ -21,43 +21,50 @@ const isProd = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
 
-// ─────────────────────────────────────────────
-// ✅ FIXED CORS (Render + Vercel safe)
-// ─────────────────────────────────────────────
+const FRONTEND_URL = process.env.CORS_ORIGIN || 'https://mizan-frontend-nu.vercel.app';
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  process.env.CORS_ORIGIN
-].filter(Boolean) as string[];
+// ─────────────────────────────
+// ✅ CORS FIX FINAL (production safe)
+// ─────────────────────────────
+const allowedOrigins = new Set<string>([
+  'http://localhost:3000',
+  'http://localhost:5173',
+  FRONTEND_URL,
+]);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // السماح للطلبات بدون origin (Postman / mobile / server-to-server)
-    if (!origin) return callback(null, true);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // السماح للطلبات بدون origin (Postman / mobile / server-to-server)
+      if (!origin) return callback(null, true);
 
-    const isAllowed = allowedOrigins.some((o) => {
-      if (!o) return false;
-      return origin === o;
-    });
+      if (allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
 
-    if (isAllowed) {
-      return callback(null, true);
-    }
+      console.log('❌ Blocked origin:', origin);
 
-    console.log("❌ Blocked origin:", origin);
+      // لا نكسر السيرفر، فقط نمنع CORS
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
-    // لا نكسر الطلب، فقط نرفض CORS بدون crash
-    return callback(null, false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-}));
-
+// مهم جدًا لـ preflight
 app.options('*', cors());
 
-// ── Middleware ───────────────────────────────
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// ─────────────────────────────
+// Middleware
+// ─────────────────────────────
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,15 +72,22 @@ if (!isProd || process.env.LOG_REQUESTS === 'true') {
   app.use(morgan('dev'));
 }
 
-// Rate limit
-app.use('/api/auth', rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-}));
+// ─────────────────────────────
+// Rate limit (auth فقط)
+// ─────────────────────────────
+app.use(
+  '/api/auth',
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
-// ── Routes ──────────────────────────────────
+// ─────────────────────────────
+// Routes
+// ─────────────────────────────
 app.get('/', (_req, res) => {
   res.json({
     success: true,
@@ -81,14 +95,14 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Health check (FIX مهم)
+// Health check
 app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return res.status(200).json({ status: 'ok' });
+    res.status(200).json({ status: 'ok' });
   } catch (err) {
-    console.error("❌ DB Health Error:", err);
-    return res.status(500).json({ status: 'error', db: 'down' });
+    console.error('❌ DB Health Error:', err);
+    res.status(500).json({ status: 'error', db: 'down' });
   }
 });
 
@@ -101,16 +115,23 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/finance', financeRoutes);
 
-// 404
+// ─────────────────────────────
+// 404 handler
+// ─────────────────────────────
 app.use((_req, res) => {
-  res.status(404).json({ success: false, error: 'Route not found' });
+  res.status(404).json({
+    success: false,
+    error: 'Route not found',
+  });
 });
 
+// ─────────────────────────────
 // Error handler
+// ─────────────────────────────
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error('🔥 ERROR:', err);
 
-  return res.status(500).json({
+  res.status(500).json({
     success: false,
     error: err instanceof Error ? err.message : 'Internal server error',
   });
@@ -118,7 +139,9 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
 app.use(errorHandler);
 
-// Start server
+// ─────────────────────────────
+// Start server (Render safe)
+// ─────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running on port ${PORT}`);
 });
